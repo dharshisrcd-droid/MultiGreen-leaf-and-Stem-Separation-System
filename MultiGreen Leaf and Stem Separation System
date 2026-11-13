@@ -1,0 +1,129 @@
+
+#include <ESP32Servo.h>
+
+// IR Sensor
+#define IR_SENSOR 27
+
+// TCS3200 Colour Sensor
+#define S0 18
+#define S1 19
+#define S2 21
+#define S3 22
+#define SENSOR_OUT 23
+
+// Servo Motor
+#define SERVO_PIN 13
+
+// Conveyor Motor Driver
+#define MOTOR_IN1 25
+#define MOTOR_IN2 26
+#define MOTOR_EN  33
+
+Servo separator;
+
+// Colour sensor readings
+int redValue, greenValue, blueValue;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(IR_SENSOR, INPUT);
+
+  pinMode(S0, OUTPUT);
+  pinMode(S1, OUTPUT);
+  pinMode(S2, OUTPUT);
+  pinMode(S3, OUTPUT);
+  pinMode(SENSOR_OUT, INPUT);
+
+  pinMode(MOTOR_IN1, OUTPUT);
+  pinMode(MOTOR_IN2, OUTPUT);
+  pinMode(MOTOR_EN, OUTPUT);
+
+  // Colour sensor frequency scaling
+  digitalWrite(S0, HIGH);
+  digitalWrite(S1, LOW);
+
+  separator.attach(SERVO_PIN);
+  separator.write(90);
+
+  Serial.println("Multi-Green Leaf and Stem Separation System");
+  Serial.println("System Ready");
+
+  startConveyor();
+}
+
+void startConveyor() {
+  digitalWrite(MOTOR_IN1, HIGH);
+  digitalWrite(MOTOR_IN2, LOW);
+  analogWrite(MOTOR_EN, 180);
+}
+
+void stopConveyor() {
+  digitalWrite(MOTOR_IN1, LOW);
+  digitalWrite(MOTOR_IN2, LOW);
+}
+
+int readColour(bool s2, bool s3) {
+  digitalWrite(S2, s2);
+  digitalWrite(S3, s3);
+  delay(50);
+
+  unsigned long pulse = pulseIn(SENSOR_OUT, LOW, 100000);
+
+  if (pulse == 0) return 0;
+
+  return pulse;
+}
+
+void loop() {
+
+  // Detect incoming material
+  if (digitalRead(IR_SENSOR) == LOW) {
+
+    stopConveyor();
+    delay(300);
+
+    // Read RGB values
+    redValue = readColour(LOW, LOW);
+    greenValue = readColour(HIGH, HIGH);
+    blueValue = readColour(LOW, HIGH);
+
+    Serial.println("Material Detected");
+
+    Serial.print("Red: ");
+    Serial.println(redValue);
+
+    Serial.print("Green: ");
+    Serial.println(greenValue);
+
+    Serial.print("Blue: ");
+    Serial.println(blueValue);
+
+    // Basic calibrated colour classification
+    if (greenValue > 0 &&
+        greenValue < redValue &&
+        greenValue < blueValue) {
+
+      Serial.println("GREEN LEAF DETECTED");
+
+      // Leaf collection direction
+      separator.write(45);
+    }
+    else {
+
+      Serial.println("STEM DETECTED");
+
+      // Stem collection direction
+      separator.write(135);
+    }
+
+    delay(1000);
+
+    separator.write(90);
+
+    delay(500);
+
+    startConveyor();
+    delay(1000);
+  }
+}
